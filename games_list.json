@@ -1,7 +1,5 @@
 [
-  {
-    "id": "game_ferms",
-    "title": "Ферма-кликер",
-    "icon": "https://icons8.com"
-  }
+  { "id": "game_ferms", "title": "Ферма-кликер", "icon": "game_ferms/icon.png" },
+  { "id": "game_racer", "title": "Гонки", "icon": "game_racer/icon.png" },
+  { "id": "game_puzzle", "title": "Пазл", "icon": "game_puzzle/icon.png" }
 ]
