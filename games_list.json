@@ -1,5 +1,6 @@
 [
-  { "id": "game_ferms", "title": "Ферма-кликер", "icon": "game_ferms/icon.png" },
+  { "id": "game_ferms", "title": "Ферма-кликер", "url": "./game_ferms/game.html"
+, "icon": "game_ferms/icon.png" },
   { "id": "game_racer", "title": "Гонки", "icon": "game_racer/icon.png" },
   { "id": "game_puzzle", "title": "Пазл", "icon": "game_puzzle/icon.png" }
 ]
