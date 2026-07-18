@@ -16,8 +16,10 @@
         #gameContainer { width: 100%; height: 100%; display: none; position: relative; background: #000; }
         iframe { width: 100%; height: 100%; border: none; }
         #backButton { position: absolute; top: 10px; left: 10px; padding: 10px 15px; background: #ff3b30; color: white; border: none; cursor: pointer; border-radius: 5px; z-index: 10; font-weight: bold; }
-        .error-msg { color: #ff6b6b; margin-top: 20px; }
+        .error-msg { color: #ff6b6b; margin-top: 20px; font-size: 18px; }
+        .debug-info { color: #aaa; font-size: 12px; margin-top: 10px; }
     </style>
+    <!-- Подключение SDK Яндекса -->
     <script src="https://yandex.ru/games/sdk/v2/"></script>
 </head>
 <body>
@@ -27,6 +29,7 @@
         <h2>Выберите игру:</h2>
         <div id="gamesGrid"></div>
         <div id="errorMsg" class="error-msg"></div>
+        <div id="debugInfo" class="debug-info"></div>
     </div>
 
     <!-- Игровой контейнер -->
@@ -36,107 +39,193 @@
     </div>
 
     <script>
-        // Конфигурация
+        // ============================================================
+        // 1. КОНФИГУРАЦИЯ И СПИСОК ИГР (ВСТРОЕННЫЙ)
+        // ============================================================
+        console.log('=== ЗАПУСК ЛАУНЧЕРА ===');
+
         const GITHUB_USERNAME = "DanilFi";
         const REPOSITORY_NAME = "cool_games";
 
-        // ВСТРОЕННЫЙ СПИСОК ИГР (никаких fetch запросов)
+        // Встроенный список игр — больше НЕ нужно загружать games_list.json
         const GAMES = [
             {
                 id: "game_ferms",
                 title: "Ферма-кликер",
-                icon: "icon.png"   // файл иконки лежит в папке game_ferms/
+                icon: "icon.png"   // иконка лежит в папке game_ferms/
             }
-            // Добавляйте сюда новые игры
+            // Добавьте сюда другие игры, например:
+            // {
+            //     id: "game_racer",
+            //     title: "Гонки",
+            //     icon: "icon.png"
+            // },
+            // {
+            //     id: "game_puzzle",
+            //     title: "Пазл",
+            //     icon: "icon.png"
+            // }
         ];
 
+        console.log('GAMES массив:', GAMES);
+        console.log('Количество игр:', GAMES.length);
+
+        // ============================================================
+        // 2. ИНИЦИАЛИЗАЦИЯ SDK (не влияет на отображение карточек)
+        // ============================================================
         let ysdk = null;
         let player = null;
 
-        // Инициализация SDK
         YaGames.init().then(_ysdk => {
             ysdk = _ysdk;
-            console.log("Яндекс SDK инициализирован");
+            console.log("✅ Яндекс SDK инициализирован");
             return ysdk.getPlayer({ scopes: false });
         }).then(_player => {
             player = _player;
-            console.log("Игрок получен");
+            console.log("✅ Игрок получен (может быть гостем)");
         }).catch(err => {
-            console.warn("SDK не инициализирован:", err);
+            console.warn("⚠️ SDK не инициализирован (возможно, не в Яндексе):", err);
         });
 
-        // Отображение игр
+        // ============================================================
+        // 3. ФУНКЦИЯ ОТОБРАЖЕНИЯ КАРТОЧЕК (БЕЗОПАСНАЯ)
+        // ============================================================
         function renderGames() {
+            console.log('▶️ Вызвана renderGames()');
             const grid = document.getElementById('gamesGrid');
+            const errorMsg = document.getElementById('errorMsg');
+            const debugInfo = document.getElementById('debugInfo');
+
+            // Очищаем сетку
             grid.innerHTML = '';
-            if (!GAMES.length) {
-                document.getElementById('errorMsg').textContent = 'Список игр пуст. Добавьте игры в код.';
+            errorMsg.textContent = '';
+            debugInfo.textContent = '';
+
+            // Проверяем, есть ли игры
+            if (!GAMES || !GAMES.length) {
+                errorMsg.textContent = '❌ Список игр пуст. Добавьте игры в массив GAMES.';
+                debugInfo.textContent = 'GAMES.length = 0';
+                console.error('❌ GAMES пуст или не определён');
                 return;
             }
-            GAMES.forEach(game => {
+
+            debugInfo.textContent = `Загружено игр: ${GAMES.length}`;
+            console.log(`✅ Начинаем рендеринг ${GAMES.length} карточек`);
+
+            // Создаём карточки
+            GAMES.forEach((game, index) => {
+                console.log(`  - Карточка ${index+1}: ${game.title} (id: ${game.id})`);
+
                 const card = document.createElement('div');
                 card.className = 'game-card';
-                // Путь к иконке
-                const iconSrc = `https://${GITHUB_USERNAME}.github.io/${REPOSITORY_NAME}/${game.id}/${game.icon}`;
-                card.innerHTML = `
-                    <img src="${iconSrc}" alt="${game.title}" 
-                         onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22 viewBox=%220 0 100 100%22%3E%3Crect fill=%22%23555%22 width=%22100%22 height=%22100%22/%3E%3Ctext x=%2250%22 y=%2250%22 font-size=%2240%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23fff%22%3E🎮%3C/text%3E%3C/svg%3E'">
-                    <p>${game.title}</p>
-                `;
-                card.onclick = () => launchGame(game.id);
+
+                // Картинка
+                const img = document.createElement('img');
+                const iconUrl = `https://${GITHUB_USERNAME}.github.io/${REPOSITORY_NAME}/${game.id}/${game.icon}`;
+                img.src = iconUrl;
+                img.alt = game.title;
+                // Если иконка не загрузится — покажем эмодзи
+                img.onerror = function() {
+                    console.warn(`⚠️ Иконка не загрузилась: ${iconUrl}, используем заглушку`);
+                    this.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect fill='%23555' width='100' height='100'/%3E%3Ctext x='50' y='55' font-size='40' text-anchor='middle' dy='.3em' fill='%23fff'%3E🎮%3C/text%3E%3C/svg%3E";
+                };
+
+                // Название
+                const p = document.createElement('p');
+                p.textContent = game.title;
+
+                // Собираем карточку
+                card.appendChild(img);
+                card.appendChild(p);
+
+                // Клик — запуск игры
+                card.onclick = function() {
+                    console.log(`🖱️ Клик по игре: ${game.id}`);
+                    launchGame(game.id);
+                };
+
                 grid.appendChild(card);
             });
+
+            console.log('✅ Рендеринг завершён');
         }
 
-        // Запуск игры (используем game.html вместо index.html)
+        // ============================================================
+        // 4. ЗАПУСК ИГРЫ (через iframe)
+        // ============================================================
         function launchGame(gameId) {
+            console.log(`🚀 Запуск игры: ${gameId}`);
             document.getElementById('menu').style.display = 'none';
             document.getElementById('gameContainer').style.display = 'block';
             const frame = document.getElementById('gameFrame');
-            // ВАЖНО: файл игры теперь game.html
-            frame.src = `https://${GITHUB_USERNAME}.github.io/${REPOSITORY_NAME}/${gameId}/game.html?gameId=${gameId}`;
+            // ВАЖНО: у вас файл игры называется game.html, а не index.html
+            const gameUrl = `https://${GITHUB_USERNAME}.github.io/${REPOSITORY_NAME}/${gameId}/game.html?gameId=${gameId}`;
+            console.log(`  → Загружаем: ${gameUrl}`);
+            frame.src = gameUrl;
         }
 
-        // Возврат в меню
+        // ============================================================
+        // 5. ВОЗВРАТ В МЕНЮ
+        // ============================================================
         function backToMenu() {
+            console.log('⬅️ Возврат в меню');
             const frame = document.getElementById('gameFrame');
             frame.src = '';
             document.getElementById('gameContainer').style.display = 'none';
             document.getElementById('menu').style.display = 'block';
         }
 
-        // Обработка сообщений от игр (реклама, сохранения)
+        // ============================================================
+        // 6. ОБРАБОТКА СООБЩЕНИЙ ОТ ИГР (реклама, сохранения)
+        // ============================================================
         window.addEventListener('message', function(event) {
             const frame = document.getElementById('gameFrame');
             if (!frame || !frame.contentWindow) return;
             const data = event.data;
             if (!data || typeof data !== 'object') return;
 
+            console.log('📩 Получено сообщение от игры:', data);
+
+            // Реклама
             if (data.type === 'SHOW_REKLAMA' && ysdk) {
                 ysdk.adv.showFullscreenAdv({
                     callbacks: {
-                        onClose: () => frame.contentWindow.postMessage({ type: 'AD_CLOSED' }, '*'),
-                        onError: () => frame.contentWindow.postMessage({ type: 'AD_CLOSED' }, '*')
+                        onClose: () => {
+                            frame.contentWindow.postMessage({ type: 'AD_CLOSED' }, '*');
+                        },
+                        onError: (err) => {
+                            console.warn('Ошибка рекламы:', err);
+                            frame.contentWindow.postMessage({ type: 'AD_CLOSED' }, '*');
+                        }
                     }
                 });
                 return;
             }
 
+            // Сохранение в облако
             if (data.type === 'YANDEX_SAVE' && player) {
                 const key = `save_${data.gameId}`;
-                player.setData({ [key]: data.payload }).catch(console.warn);
+                player.setData({ [key]: data.payload }).then(() => {
+                    console.log(`✅ Сохранено для ${data.gameId}`);
+                }).catch(err => {
+                    console.warn('Ошибка сохранения:', err);
+                });
                 return;
             }
 
+            // Загрузка из облака
             if (data.type === 'YANDEX_LOAD' && player) {
                 const key = `save_${data.gameId}`;
                 player.getData([key]).then(result => {
+                    const saved = result[key] || null;
                     frame.contentWindow.postMessage({
                         type: 'YANDEX_LOAD_SUCCESS',
                         gameId: data.gameId,
-                        data: result[key] || null
+                        data: saved
                     }, '*');
-                }).catch(() => {
+                    console.log(`✅ Загружено для ${data.gameId}`);
+                }).catch(err => {
+                    console.warn('Ошибка загрузки:', err);
                     frame.contentWindow.postMessage({
                         type: 'YANDEX_LOAD_SUCCESS',
                         gameId: data.gameId,
@@ -147,9 +236,20 @@
             }
         });
 
-        // Запускаем отображение
-        renderGames();
-        console.log('Лаунчер загружен, количество игр:', GAMES.length);
+        // ============================================================
+        // 7. ЗАПУСК ПРИ ЗАГРУЗКЕ DOM
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📄 DOM полностью загружен');
+            renderGames();
+            console.log('=== ЛАУНЧЕР ГОТОВ ===');
+        });
+
+        // Дополнительно: если DOM уже загружен (редкий случай), вызвать сразу
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            console.log('⚠️ DOM уже загружен, вызываем renderGames() напрямую');
+            renderGames();
+        }
     </script>
 </body>
 </html>
