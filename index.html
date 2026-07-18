@@ -1,27 +1,192 @@
-// Список игр с указанием локального файла
-const GAMES = [
-    { id: "game_ferms", title: "Ферма-кликер", icon: "icon.png", file: "game.html" },
-    // если есть другие игры, добавьте их сюда:
-    // { id: "race", title: "Гонки", icon: "icon.png", file: "index.html" },
-    // { id: "puzzle", title: "Пазл", icon: "icon.png", file: "index.html" }
-];
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Сборник игр</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html { width: 100%; height: 100%; background: #1a1a1a; font-family: sans-serif; color: white; overflow: hidden; }
+        #menu { padding: 20px; display: flex; flex-direction: column; align-items: center; height: 100%; overflow-y: auto; }
+        #gamesGrid { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; margin-top: 20px; }
+        .game-card { width: 120px; text-align: center; background: #333; padding: 10px; border-radius: 8px; cursor: pointer; transition: transform 0.2s; }
+        .game-card:active { transform: scale(0.95); }
+        .game-card img { width: 100px; height: 100px; border-radius: 8px; background: #555; object-fit: cover; }
+        .game-card p { margin-top: 8px; font-size: 14px; }
+        #gameContainer { display: none; width: 100%; height: 100%; position: relative; background: #000; }
+        iframe { width: 100%; height: 100%; border: none; }
+        #backButton { position: absolute; top: 10px; left: 10px; padding: 10px 15px; background: #ff3b30; color: white; border: none; border-radius: 5px; z-index: 10; font-weight: bold; cursor: pointer; }
+        .debug { color: #888; font-size: 12px; margin-top: 10px; }
+    </style>
+    <script src="https://yandex.ru/games/sdk/v2/"></script>
+</head>
+<body>
+    <!-- Меню -->
+    <div id="menu">
+        <h2>Выберите игру:</h2>
+        <div id="gamesGrid"></div>
+        <div class="debug" id="debugInfo">Загрузка...</div>
+    </div>
 
-// Запуск игры (локально, без GitHub)
-function launchGame(gameId) {
-    // Находим игру по id
-    const game = GAMES.find(g => g.id === gameId);
-    if (!game) {
-        console.error('Игра не найдена:', gameId);
-        return;
-    }
+    <!-- Игровой контейнер -->
+    <div id="gameContainer">
+        <button id="backButton" onclick="backToMenu()">⬅ В меню</button>
+        <iframe id="gameFrame" src="" allow="autoplay; fullscreen"></iframe>
+    </div>
 
-    // Скрываем меню, показываем контейнер
-    document.getElementById('menu').style.display = 'none';
-    document.getElementById('gameContainer').style.display = 'block';
+    <script>
+        // ============================================================
+        // 1. КОНФИГУРАЦИЯ (локальные файлы)
+        // ============================================================
+        // Список игр. У каждой игры указываем:
+        //   id - идентификатор (совпадает с именем папки)
+        //   title - название для отображения
+        //   icon - имя файла иконки (лежит в папке игры)
+        //   file - имя HTML-файла игры (например, "game.html" или "index.html")
+        const GAMES = [
+            { id: "game_ferms", title: "Ферма-кликер", icon: "icon.png", file: "game.html" }
+            // Добавляйте другие игры по аналогии:
+            // { id: "game_racer", title: "Гонки", icon: "icon.png", file: "index.html" },
+            // { id: "game_puzzle", title: "Пазл", icon: "icon.png", file: "index.html" }
+        ];
 
-    const frame = document.getElementById('gameFrame');
-    // Формируем локальный путь: папка_игры / файл_игры
-    const localPath = `${gameId}/${game.file}`;
-    frame.src = localPath;
-    console.log(`Запускаем локальную игру: ${localPath}`);
-}
+        // ============================================================
+        // 2. ИНИЦИАЛИЗАЦИЯ SDK (не блокирует отображение)
+        // ============================================================
+        let ysdk = null;
+        let player = null;
+        try {
+            YaGames.init().then(sdk => {
+                ysdk = sdk;
+                console.log("SDK инициализирован");
+                return sdk.getPlayer({ scopes: false });
+            }).then(p => {
+                player = p;
+                console.log("Игрок получен");
+            }).catch(err => console.warn("SDK не инициализирован:", err));
+        } catch(e) {
+            console.warn("Ошибка при инициализации SDK:", e);
+        }
+
+        // ============================================================
+        // 3. ОТРИСОВКА КАРТОЧЕК (локальные иконки)
+        // ============================================================
+        function renderGames() {
+            const grid = document.getElementById('gamesGrid');
+            grid.innerHTML = '';
+            const debug = document.getElementById('debugInfo');
+
+            GAMES.forEach(game => {
+                const card = document.createElement('div');
+                card.className = 'game-card';
+
+                const img = document.createElement('img');
+                // Иконка лежит в папке игры
+                img.src = `${game.id}/${game.icon}`;
+                img.alt = game.title;
+                img.onerror = function() {
+                    this.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect fill='%23555' width='100' height='100'/%3E%3Ctext x='50' y='55' font-size='40' text-anchor='middle' dy='.3em' fill='%23fff'%3E🎮%3C/text%3E%3C/svg%3E";
+                };
+
+                const p = document.createElement('p');
+                p.textContent = game.title;
+
+                card.appendChild(img);
+                card.appendChild(p);
+
+                card.onclick = function() {
+                    launchGame(game.id);
+                };
+
+                grid.appendChild(card);
+            });
+
+            debug.textContent = `✅ Загружено игр: ${GAMES.length}`;
+        }
+
+        // ============================================================
+        // 4. ЗАПУСК ИГРЫ (ЛОКАЛЬНО, без GitHub)
+        // ============================================================
+        function launchGame(gameId) {
+            const game = GAMES.find(g => g.id === gameId);
+            if (!game) {
+                console.error('Игра не найдена:', gameId);
+                return;
+            }
+
+            document.getElementById('menu').style.display = 'none';
+            document.getElementById('gameContainer').style.display = 'block';
+
+            const frame = document.getElementById('gameFrame');
+            // Локальный путь: папка_игры / файл_игры
+            const localPath = `${game.id}/${game.file}`;
+            frame.src = localPath;
+            console.log(`Запускаем локальную игру: ${localPath}`);
+        }
+
+        // ============================================================
+        // 5. ВОЗВРАТ В МЕНЮ
+        // ============================================================
+        function backToMenu() {
+            const frame = document.getElementById('gameFrame');
+            frame.src = '';
+            document.getElementById('gameContainer').style.display = 'none';
+            document.getElementById('menu').style.display = 'block';
+        }
+
+        // ============================================================
+        // 6. ОБРАБОТКА СООБЩЕНИЙ ОТ ИГР (реклама, сохранения)
+        // ============================================================
+        window.addEventListener('message', function(event) {
+            const frame = document.getElementById('gameFrame');
+            if (!frame || !frame.contentWindow) return;
+            const data = event.data;
+            if (!data || typeof data !== 'object') return;
+
+            console.log('Сообщение от игры:', data);
+
+            if (data.type === 'SHOW_REKLAMA' && ysdk) {
+                ysdk.adv.showFullscreenAdv({
+                    callbacks: {
+                        onClose: () => frame.contentWindow.postMessage({ type: 'AD_CLOSED' }, '*'),
+                        onError: () => frame.contentWindow.postMessage({ type: 'AD_CLOSED' }, '*')
+                    }
+                });
+                return;
+            }
+
+            if (data.type === 'YANDEX_SAVE' && player) {
+                const key = `save_${data.gameId}`;
+                player.setData({ [key]: data.payload }).then(() => {
+                    console.log(`Сохранено для ${data.gameId}`);
+                }).catch(err => console.warn('Ошибка сохранения:', err));
+                return;
+            }
+
+            if (data.type === 'YANDEX_LOAD' && player) {
+                const key = `save_${data.gameId}`;
+                player.getData([key]).then(result => {
+                    frame.contentWindow.postMessage({
+                        type: 'YANDEX_LOAD_SUCCESS',
+                        gameId: data.gameId,
+                        data: result[key] || null
+                    }, '*');
+                }).catch(() => {
+                    frame.contentWindow.postMessage({
+                        type: 'YANDEX_LOAD_SUCCESS',
+                        gameId: data.gameId,
+                        data: null
+                    }, '*');
+                });
+                return;
+            }
+        });
+
+        // ============================================================
+        // 7. ЗАПУСК
+        // ============================================================
+        renderGames();
+        console.log('Лаунчер загружен, игры открываются локально');
+    </script>
+</body>
+</html>
