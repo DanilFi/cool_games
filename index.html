@@ -36,48 +36,36 @@
     </div>
 
     <script>
-        // ==================== КОНФИГУРАЦИЯ ====================
+        // Конфигурация
         const GITHUB_USERNAME = "DanilFi";
         const REPOSITORY_NAME = "cool_games";
 
-        // ==================== СПИСОК ИГР (встроенный) ====================
-        // Теперь не нужно загружать games_list.json — всё здесь.
+        // ВСТРОЕННЫЙ СПИСОК ИГР (никаких fetch запросов)
         const GAMES = [
             {
                 id: "game_ferms",
                 title: "Ферма-кликер",
-                icon: "icon.png"   // относительный путь внутри папки игры
-            },
-            // Добавьте сюда другие игры, когда они появятся
-            // {
-            //     id: "game_racer",
-            //     title: "Гонки",
-            //     icon: "icon.png"
-            // },
-            // {
-            //     id: "game_puzzle",
-            //     title: "Пазл",
-            //     icon: "icon.png"
-            // }
+                icon: "icon.png"   // файл иконки лежит в папке game_ferms/
+            }
+            // Добавляйте сюда новые игры
         ];
 
         let ysdk = null;
         let player = null;
 
-        // 1. Инициализация SDK
+        // Инициализация SDK
         YaGames.init().then(_ysdk => {
             ysdk = _ysdk;
             console.log("Яндекс SDK инициализирован");
             return ysdk.getPlayer({ scopes: false });
         }).then(_player => {
             player = _player;
-            console.log("Игрок получен (может быть гостем)");
-            // После авторизации можно подгрузить сохранения для активной игры (если нужно)
+            console.log("Игрок получен");
         }).catch(err => {
-            console.warn("SDK не инициализирован (возможно, не в Яндексе):", err);
+            console.warn("SDK не инициализирован:", err);
         });
 
-        // 2. Отображение игр (без fetch)
+        // Отображение игр
         function renderGames() {
             const grid = document.getElementById('gamesGrid');
             grid.innerHTML = '';
@@ -88,7 +76,7 @@
             GAMES.forEach(game => {
                 const card = document.createElement('div');
                 card.className = 'game-card';
-                // Формируем URL иконки: папка игры + имя файла
+                // Путь к иконке
                 const iconSrc = `https://${GITHUB_USERNAME}.github.io/${REPOSITORY_NAME}/${game.id}/${game.icon}`;
                 card.innerHTML = `
                     <img src="${iconSrc}" alt="${game.title}" 
@@ -100,15 +88,16 @@
             });
         }
 
-        // 3. Запуск игры
+        // Запуск игры (используем game.html вместо index.html)
         function launchGame(gameId) {
             document.getElementById('menu').style.display = 'none';
             document.getElementById('gameContainer').style.display = 'block';
             const frame = document.getElementById('gameFrame');
-            frame.src = `https://${GITHUB_USERNAME}.github.io/${REPOSITORY_NAME}/${gameId}/index.html?gameId=${gameId}`;
+            // ВАЖНО: файл игры теперь game.html
+            frame.src = `https://${GITHUB_USERNAME}.github.io/${REPOSITORY_NAME}/${gameId}/game.html?gameId=${gameId}`;
         }
 
-        // 4. Возврат в меню
+        // Возврат в меню
         function backToMenu() {
             const frame = document.getElementById('gameFrame');
             frame.src = '';
@@ -116,7 +105,7 @@
             document.getElementById('menu').style.display = 'block';
         }
 
-        // 5. Обработка сообщений от игр (реклама, сохранения)
+        // Обработка сообщений от игр (реклама, сохранения)
         window.addEventListener('message', function(event) {
             const frame = document.getElementById('gameFrame');
             if (!frame || !frame.contentWindow) return;
@@ -126,47 +115,31 @@
             if (data.type === 'SHOW_REKLAMA' && ysdk) {
                 ysdk.adv.showFullscreenAdv({
                     callbacks: {
-                        onClose: () => {
-                            frame.contentWindow.postMessage({ type: 'AD_CLOSED' }, '*');
-                        },
-                        onError: (err) => {
-                            console.warn('Ошибка рекламы:', err);
-                            frame.contentWindow.postMessage({ type: 'AD_CLOSED' }, '*');
-                        }
+                        onClose: () => frame.contentWindow.postMessage({ type: 'AD_CLOSED' }, '*'),
+                        onError: () => frame.contentWindow.postMessage({ type: 'AD_CLOSED' }, '*')
                     }
                 });
                 return;
             }
 
             if (data.type === 'YANDEX_SAVE' && player) {
-                const gameId = data.gameId;
-                const payload = data.payload;
-                if (!gameId || payload === undefined) return;
-                const key = `save_${gameId}`;
-                player.setData({ [key]: payload }).then(() => {
-                    console.log(`Сохранено ${gameId} в облако`);
-                }).catch(err => {
-                    console.warn('Ошибка сохранения:', err);
-                });
+                const key = `save_${data.gameId}`;
+                player.setData({ [key]: data.payload }).catch(console.warn);
                 return;
             }
 
             if (data.type === 'YANDEX_LOAD' && player) {
-                const gameId = data.gameId;
-                if (!gameId) return;
-                const key = `save_${gameId}`;
+                const key = `save_${data.gameId}`;
                 player.getData([key]).then(result => {
-                    const saved = result[key] || null;
                     frame.contentWindow.postMessage({
                         type: 'YANDEX_LOAD_SUCCESS',
-                        gameId: gameId,
-                        data: saved
+                        gameId: data.gameId,
+                        data: result[key] || null
                     }, '*');
-                }).catch(err => {
-                    console.warn('Ошибка загрузки:', err);
+                }).catch(() => {
                     frame.contentWindow.postMessage({
                         type: 'YANDEX_LOAD_SUCCESS',
-                        gameId: gameId,
+                        gameId: data.gameId,
                         data: null
                     }, '*');
                 });
@@ -174,8 +147,9 @@
             }
         });
 
-        // Запускаем отображение игр
+        // Запускаем отображение
         renderGames();
+        console.log('Лаунчер загружен, количество игр:', GAMES.length);
     </script>
 </body>
 </html>
