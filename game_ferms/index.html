@@ -329,6 +329,84 @@
         clickField();
     });
 
+    // ==========================================
+// МОДУЛЬ СВЯЗИ С ЯНДЕКСОМ ДЛЯ МИНИ-ИГРЫ
+// ==========================================
+
+// 1. Автоматически определяем ID этой игры из адресной строки
+const urlParams = new URLSearchParams(window.location.search);
+const MY_GAME_ID = urlParams.get('gameId') || 'unknown_game';
+
+/**
+ * Вызывайте эту функцию, когда нужно показать полноэкранную рекламу
+ * @param {Function} callback - функция, которая выполнится СРАЗУ ПОСЛЕ закрытия рекламы
+ */
+function showYandexAd(callback) {
+    console.log("Запрос рекламы Яндекса...");
+    window.parent.postMessage({ type: 'SHOW_REKLAMA' }, '*');
+
+    // Ждем, пока лаунчер скажет, что реклама закрылась
+    window.addEventListener('message', function listenAd(event) {
+        if (event.data.type === 'AD_CLOSED') {
+            window.removeEventListener('message', listenAd);
+            if (callback) callback(); // Возвращаем игрока в игру
+        }
+    });
+}
+
+/**
+ * Вызывайте для сохранения любого прогресса (монеты, уровни, настройки)
+ * @param {Object} dataObject - Объект с данными, например: { coins: 100, lvl: 3 }
+ */
+function saveGameData(dataObject) {
+    window.parent.postMessage({
+        type: 'YANDEX_SAVE',
+        gameId: MY_GAME_ID,
+        payload: dataObject
+    }, '*');
+}
+
+/**
+ * Вызывайте при старте игры, чтобы загрузить сохранения
+ * @param {Function} callback - функция, в которую придут данные. Пример: function(data) { ... }
+ */
+function loadGameData(callback) {
+    window.parent.postMessage({
+        type: 'YANDEX_LOAD',
+        gameId: MY_GAME_ID
+    }, '*');
+
+    window.addEventListener('message', function listenLoad(event) {
+        if (event.data.type === 'YANDEX_LOAD_SUCCESS' && event.data.gameId === MY_GAME_ID) {
+            window.removeEventListener('message', listenLoad);
+            callback(event.data.data); // Передаем сохраненный объект обратно в игру
+        }
+    });
+}
+
+// ==========================================
+// ПРИМЕР ИСПОЛЬЗОВАНИЯ В ВАШЕМ КОДЕ:
+// ==========================================
+/*
+  // 1. Как загрузить данные при старте игры:
+  loadGameData(function(savedData) {
+      if (savedData.coins) {
+          playerCoins = savedData.coins; // если сохранения были, берем монеты
+      } else {
+          playerCoins = 0; // если игрок зашел впервые
+      }
+  });
+
+  // 2. Как сохранить данные (например, после покупки или уровня):
+  saveGameData({ coins: playerCoins, currentLevel: 5 });
+
+  // 3. Как показать рекламу (например, при проигрыше):
+  showYandexAd(function() {
+      console.log("Реклама закончилась! Возрождаем игрока.");
+      restartGame(); 
+  });
+*/
+
     // ==================== ЗАПУСК ====================
     initPlatform();
 </script>
