@@ -1,205 +1,27 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Сборник игр</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body, html { width: 100%; height: 100%; background: #1a1a1a; font-family: sans-serif; color: white; overflow: hidden; }
-        #menu { padding: 20px; display: flex; flex-direction: column; align-items: center; height: 100%; overflow-y: auto; }
-        #gamesGrid { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; margin-top: 20px; }
-        .game-card { width: 120px; text-align: center; background: #333; padding: 10px; border-radius: 8px; cursor: pointer; transition: transform 0.2s; }
-        .game-card:active { transform: scale(0.95); }
-        .game-card img { width: 100px; height: 100px; border-radius: 8px; background: #555; object-fit: cover; }
-        .game-card p { margin-top: 8px; font-size: 14px; }
-        #gameContainer { display: none; width: 100%; height: 100%; position: relative; background: #000; }
-        iframe { width: 100%; height: 100%; border: none; }
-        #backButton { position: absolute; top: 10px; left: 10px; padding: 10px 15px; background: #ff3b30; color: white; border: none; border-radius: 5px; z-index: 10; font-weight: bold; cursor: pointer; }
-        .debug { color: #888; font-size: 12px; margin-top: 10px; }
-    </style>
-    <!-- Подключаем SDK (но не даём ему ломать страницу) -->
-    <script src="https://yandex.ru/games/sdk/v2/"></script>
-</head>
-<body>
-    <!-- Меню -->
-    <div id="menu">
-        <h2>Выберите игру:</h2>
-        <div id="gamesGrid"></div>
-        <div class="debug" id="debugInfo">Загрузка...</div>
-    </div>
+// Список игр с указанием локального файла
+const GAMES = [
+    { id: "game_ferms", title: "Ферма-кликер", icon: "icon.png", file: "game.html" },
+    // если есть другие игры, добавьте их сюда:
+    // { id: "race", title: "Гонки", icon: "icon.png", file: "index.html" },
+    // { id: "puzzle", title: "Пазл", icon: "icon.png", file: "index.html" }
+];
 
-    <!-- Игровой контейнер -->
-    <div id="gameContainer">
-        <button id="backButton" onclick="backToMenu()">⬅ В меню</button>
-        <iframe id="gameFrame" src="" allow="autoplay; fullscreen"></iframe>
-    </div>
+// Запуск игры (локально, без GitHub)
+function launchGame(gameId) {
+    // Находим игру по id
+    const game = GAMES.find(g => g.id === gameId);
+    if (!game) {
+        console.error('Игра не найдена:', gameId);
+        return;
+    }
 
-    <script>
-        // ============================================================
-        // 1. КОНФИГУРАЦИЯ
-        // ============================================================
-        const GITHUB_USERNAME = "DanilFi";
-        const REPOSITORY_NAME = "cool_games";
+    // Скрываем меню, показываем контейнер
+    document.getElementById('menu').style.display = 'none';
+    document.getElementById('gameContainer').style.display = 'block';
 
-        // Встроенный список игр
-        const GAMES = [
-            { id: "game_ferms", title: "Ферма-кликер", icon: "icon.png" }
-            // Добавляйте новые игры сюда:
-            // { id: "game_racer", title: "Гонки", icon: "icon.png" },
-            // { id: "game_puzzle", title: "Пазл", icon: "icon.png" }
-        ];
-
-        // ============================================================
-        // 2. ИНИЦИАЛИЗАЦИЯ SDK (тихо, без ошибок)
-        // ============================================================
-        let ysdk = null;
-        let player = null;
-
-        try {
-            YaGames.init().then(sdk => {
-                ysdk = sdk;
-                console.log("SDK инициализирован");
-                return sdk.getPlayer({ scopes: false });
-            }).then(p => {
-                player = p;
-                console.log("Игрок получен");
-            }).catch(err => {
-                console.warn("SDK не инициализирован (возможно, не в Яндексе):", err);
-            });
-        } catch(e) {
-            console.warn("Ошибка при инициализации SDK:", e);
-        }
-
-        // ============================================================
-        // 3. ОТРИСОВКА КАРТОЧЕК (как в упрощённом варианте)
-        // ============================================================
-        function renderGames() {
-            const grid = document.getElementById('gamesGrid');
-            grid.innerHTML = '';
-            const debug = document.getElementById('debugInfo');
-
-            if (!GAMES.length) {
-                debug.textContent = '⚠️ Список игр пуст';
-                return;
-            }
-
-            GAMES.forEach(game => {
-                const card = document.createElement('div');
-                card.className = 'game-card';
-
-                const img = document.createElement('img');
-                // Ссылка на иконку в репозитории
-                img.src = `https://${GITHUB_USERNAME}.github.io/${REPOSITORY_NAME}/${game.id}/${game.icon}`;
-                img.alt = game.title;
-                // Заглушка, если картинка не загрузилась
-                img.onerror = function() {
-                    this.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect fill='%23555' width='100' height='100'/%3E%3Ctext x='50' y='55' font-size='40' text-anchor='middle' dy='.3em' fill='%23fff'%3E🎮%3C/text%3E%3C/svg%3E";
-                };
-
-                const p = document.createElement('p');
-                p.textContent = game.title;
-
-                card.appendChild(img);
-                card.appendChild(p);
-
-                // Клик – запускаем игру
-                card.onclick = function() {
-                    launchGame(game.id);
-                };
-
-                grid.appendChild(card);
-            });
-
-            debug.textContent = `✅ Загружено игр: ${GAMES.length}`;
-        }
-
-        // ============================================================
-        // 4. ЗАПУСК ИГРЫ (через iframe)
-        // ============================================================
-        function launchGame(gameId) {
-            // Скрываем меню, показываем контейнер
-            document.getElementById('menu').style.display = 'none';
-            document.getElementById('gameContainer').style.display = 'block';
-
-            const frame = document.getElementById('gameFrame');
-            // ВАЖНО: у вас файл игры называется game.html (не index.html)
-            const url = `https://${GITHUB_USERNAME}.github.io/${REPOSITORY_NAME}/${gameId}/game.html?gameId=${gameId}`;
-            frame.src = url;
-            console.log(`Запускаем игру: ${url}`);
-        }
-
-        // ============================================================
-        // 5. ВОЗВРАТ В МЕНЮ
-        // ============================================================
-        function backToMenu() {
-            const frame = document.getElementById('gameFrame');
-            frame.src = ''; // останавливаем загрузку
-            document.getElementById('gameContainer').style.display = 'none';
-            document.getElementById('menu').style.display = 'block';
-        }
-
-        // ============================================================
-        // 6. ОБРАБОТКА СООБЩЕНИЙ ОТ ИГР (реклама, сохранения)
-        // ============================================================
-        window.addEventListener('message', function(event) {
-            const frame = document.getElementById('gameFrame');
-            if (!frame || !frame.contentWindow) return;
-            const data = event.data;
-            if (!data || typeof data !== 'object') return;
-
-            console.log('Сообщение от игры:', data);
-
-            // ---- Реклама ----
-            if (data.type === 'SHOW_REKLAMA' && ysdk) {
-                ysdk.adv.showFullscreenAdv({
-                    callbacks: {
-                        onClose: () => {
-                            frame.contentWindow.postMessage({ type: 'AD_CLOSED' }, '*');
-                        },
-                        onError: () => {
-                            frame.contentWindow.postMessage({ type: 'AD_CLOSED' }, '*');
-                        }
-                    }
-                });
-                return;
-            }
-
-            // ---- Сохранение в облако ----
-            if (data.type === 'YANDEX_SAVE' && player) {
-                const key = `save_${data.gameId}`;
-                player.setData({ [key]: data.payload }).then(() => {
-                    console.log(`Сохранено для ${data.gameId}`);
-                }).catch(err => console.warn('Ошибка сохранения:', err));
-                return;
-            }
-
-            // ---- Загрузка из облака ----
-            if (data.type === 'YANDEX_LOAD' && player) {
-                const key = `save_${data.gameId}`;
-                player.getData([key]).then(result => {
-                    const saved = result[key] || null;
-                    frame.contentWindow.postMessage({
-                        type: 'YANDEX_LOAD_SUCCESS',
-                        gameId: data.gameId,
-                        data: saved
-                    }, '*');
-                }).catch(() => {
-                    frame.contentWindow.postMessage({
-                        type: 'YANDEX_LOAD_SUCCESS',
-                        gameId: data.gameId,
-                        data: null
-                    }, '*');
-                });
-                return;
-            }
-        });
-
-        // ============================================================
-        // 7. ЗАПУСК
-        // ============================================================
-        renderGames();
-        console.log('Лаунчер загружен');
-    </script>
-</body>
-</html>
+    const frame = document.getElementById('gameFrame');
+    // Формируем локальный путь: папка_игры / файл_игры
+    const localPath = `${gameId}/${game.file}`;
+    frame.src = localPath;
+    console.log(`Запускаем локальную игру: ${localPath}`);
+}
