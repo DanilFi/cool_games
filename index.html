@@ -23,7 +23,7 @@
 <body>
     <!-- Меню -->
     <div id="menu">
-        <h2>Выберите игру:</h2>
+        <h2 id="menuTitle">Выберите игру:</h2>
         <div id="gamesGrid"></div>
         <div class="debug" id="debugInfo">Загрузка...</div>
     </div>
@@ -36,13 +36,97 @@
 
     <script>
         // ============================================================
-        // 1. КОНФИГУРАЦИЯ (локальные файлы)
+        // 1. ПЕРЕВОДЫ
         // ============================================================
-        // Список игр. У каждой игры указываем:
-        //   id - идентификатор (совпадает с именем папки)
-        //   title - название для отображения
-        //   icon - имя файла иконки (лежит в папке игры)
-        //   file - имя HTML-файла игры (например, "game.html" или "index.html")
+        const TRANSLATIONS = {
+            ru: {
+                title: 'Выберите игру:',
+                back: '⬅ В меню',
+                loading: 'Загрузка...',
+                loaded: '✅ Загружено игр: '
+            },
+            en: {
+                title: 'Choose a game:',
+                back: '⬅ Back to menu',
+                loading: 'Loading...',
+                loaded: '✅ Games loaded: '
+            },
+            tr: {
+                title: 'Bir oyun seçin:',
+                back: '⬅ Menüye dön',
+                loading: 'Yükleniyor...',
+                loaded: '✅ Oyunlar yüklendi: '
+            },
+            kk: {
+                title: 'Ойынды таңдаңыз:',
+                back: '⬅ Мәзірге оралу',
+                loading: 'Жүктелуде...',
+                loaded: '✅ Ойындар жүктелді: '
+            }
+            // добавьте другие языки при необходимости
+        };
+
+        // ============================================================
+        // 2. АВТООПРЕДЕЛЕНИЕ ЯЗЫКА
+        // ============================================================
+        let currentLang = 'ru';
+        let translations = TRANSLATIONS.ru;
+        let ysdk = null;
+        let player = null;
+
+        async function initSDK() {
+            try {
+                ysdk = await YaGames.init();
+                // Получаем язык игрока через SDK
+                const lang = ysdk.environment.i18n.lang; // 'ru', 'en', 'tr', 'kk' ...
+                // Проверяем, есть ли перевод для этого языка, иначе fallback
+                if (TRANSLATIONS[lang]) {
+                    currentLang = lang;
+                    translations = TRANSLATIONS[lang];
+                } else {
+                    // Если язык не поддерживается, оставляем русский
+                    translations = TRANSLATIONS.ru;
+                }
+                console.log(`SDK инициализирован. Язык: ${currentLang}`);
+
+                // Получаем игрока для сохранений
+                try {
+                    player = await ysdk.getPlayer({ scopes: false });
+                    console.log("Игрок получен");
+                } catch(e) {
+                    console.warn("Игрок не авторизован:", e);
+                }
+
+                // Обновляем UI после получения языка
+                updateUI();
+            } catch (e) {
+                console.error('Ошибка инициализации SDK:', e);
+                // Если SDK не загрузился, используем русский
+                translations = TRANSLATIONS.ru;
+                updateUI();
+            }
+            // Рендерим карточки (они не зависят от языка)
+            renderGames();
+        }
+
+        // ============================================================
+        // 3. ОБНОВЛЕНИЕ UI (язык)
+        // ============================================================
+        function updateUI() {
+            document.getElementById('menuTitle').textContent = translations.title;
+            document.getElementById('backButton').textContent = translations.back;
+            // Если уже есть debugInfo, обновим её (но она будет перезаписана позже)
+            const debug = document.getElementById('debugInfo');
+            if (debug.textContent.startsWith('✅')) {
+                debug.textContent = translations.loaded + GAMES.length;
+            } else {
+                debug.textContent = translations.loading;
+            }
+        }
+
+        // ============================================================
+        // 4. КОНФИГУРАЦИЯ ИГР (локальные файлы)
+        // ============================================================
         const GAMES = [
             { id: "game_ferms", title: "Ферма-кликер", icon: "icon.png", file: "game.html" }
             // Добавляйте другие игры по аналогии:
@@ -51,25 +135,7 @@
         ];
 
         // ============================================================
-        // 2. ИНИЦИАЛИЗАЦИЯ SDK (не блокирует отображение)
-        // ============================================================
-        let ysdk = null;
-        let player = null;
-        try {
-            YaGames.init().then(sdk => {
-                ysdk = sdk;
-                console.log("SDK инициализирован");
-                return sdk.getPlayer({ scopes: false });
-            }).then(p => {
-                player = p;
-                console.log("Игрок получен");
-            }).catch(err => console.warn("SDK не инициализирован:", err));
-        } catch(e) {
-            console.warn("Ошибка при инициализации SDK:", e);
-        }
-
-        // ============================================================
-        // 3. ОТРИСОВКА КАРТОЧЕК (локальные иконки)
+        // 5. ОТРИСОВКА КАРТОЧЕК (локальные иконки)
         // ============================================================
         function renderGames() {
             const grid = document.getElementById('gamesGrid');
@@ -81,7 +147,6 @@
                 card.className = 'game-card';
 
                 const img = document.createElement('img');
-                // Иконка лежит в папке игры
                 img.src = `${game.id}/${game.icon}`;
                 img.alt = game.title;
                 img.onerror = function() {
@@ -101,11 +166,11 @@
                 grid.appendChild(card);
             });
 
-            debug.textContent = `✅ Загружено игр: ${GAMES.length}`;
+            debug.textContent = translations.loaded + GAMES.length;
         }
 
         // ============================================================
-        // 4. ЗАПУСК ИГРЫ (ЛОКАЛЬНО, без GitHub)
+        // 6. ЗАПУСК ИГРЫ (локально, с передачей языка)
         // ============================================================
         function launchGame(gameId) {
             const game = GAMES.find(g => g.id === gameId);
@@ -119,13 +184,15 @@
 
             const frame = document.getElementById('gameFrame');
             // Локальный путь: папка_игры / файл_игры
-            const localPath = `${game.id}/${game.file}`;
+            let localPath = `${game.id}/${game.file}`;
+            // Добавляем параметр языка, чтобы игра могла его использовать (опционально)
+            localPath += `?lang=${currentLang}`;
             frame.src = localPath;
             console.log(`Запускаем локальную игру: ${localPath}`);
         }
 
         // ============================================================
-        // 5. ВОЗВРАТ В МЕНЮ
+        // 7. ВОЗВРАТ В МЕНЮ
         // ============================================================
         function backToMenu() {
             const frame = document.getElementById('gameFrame');
@@ -135,7 +202,7 @@
         }
 
         // ============================================================
-        // 6. ОБРАБОТКА СООБЩЕНИЙ ОТ ИГР (реклама, сохранения)
+        // 8. ОБРАБОТКА СООБЩЕНИЙ ОТ ИГР (реклама, сохранения)
         // ============================================================
         window.addEventListener('message', function(event) {
             const frame = document.getElementById('gameFrame');
@@ -183,10 +250,11 @@
         });
 
         // ============================================================
-        // 7. ЗАПУСК
+        // 9. ЗАПУСК (сначала инициализация SDK, затем рендеринг)
         // ============================================================
-        renderGames();
-        console.log('Лаунчер загружен, игры открываются локально');
+        // Вызываем initSDK(), которая после получения языка вызовет renderGames()
+        initSDK();
+        console.log('Лаунчер загружен, идёт определение языка...');
     </script>
 </body>
 </html>
