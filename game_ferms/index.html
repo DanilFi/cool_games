@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ферма-кликер</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+        body {
+            background: #2e5a2e;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            touch-action: manipulation;
+        }
+        #game {
+            background: #4a7a4a;
+            border-radius: 24px;
+            padding: 20px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            color: #fff;
+            text-align: center;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 0 #1f3a1f;
+        }
+        .field {
+            background: #8bc34a;
+            border-radius: 40px;
+            padding: 30px 20px;
+            margin: 10px 0 20px;
+            cursor: pointer;
+            border: 4px solid #558b2f;
+            transition: transform 0.1s;
+            touch-action: manipulation;
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .field:active {
+            transform: scale(0.96);
+        }
+        .field .emoji {
+            font-size: 4rem;
+            line-height: 1;
+        }
+        .field .info {
+            font-size: 1.2rem;
+            color: #1f3a1f;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            background: #2d5a2d;
+            padding: 12px;
+            border-radius: 30px;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+        }
+        .stats span {
+            background: #1f3a1f;
+            padding: 6px 18px;
+            border-radius: 20px;
+            min-width: 80px;
+        }
+        .upgrades {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 10px;
+        }
+        .upgrade-item {
+            background: #3d6b3d;
+            border-radius: 40px;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 2px solid #558b2f;
+        }
+        .upgrade-item .desc {
+            text-align: left;
+            font-weight: bold;
+        }
+        .upgrade-item .price {
+            background: #1f3a1f;
+            padding: 4px 16px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+        }
+        .upgrade-item button {
+            background: #ffc107;
+            border: none;
+            color: #1f3a1f;
+            font-weight: bold;
+            padding: 8px 20px;
+            border-radius: 30px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            touch-action: manipulation;
+        }
+        .upgrade-item button:active {
+            transform: scale(0.95);
+        }
+        .upgrade-item button:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+        @media (max-width: 400px) {
+            h1 { font-size: 1.5rem; }
+            .stats { font-size: 0.9rem; flex-wrap: wrap; gap: 8px; }
+            .upgrade-item { flex-wrap: wrap; justify-content: center; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+<div id="game">
+    <h1 id="title">Ферма-кликер</h1>
+    <div class="field" id="clickField">
+        <div class="emoji">🌾</div>
+        <div class="info" id="clickHint">Кликни, чтобы собрать</div>
+    </div>
+    <div class="stats">
+        <span id="coinsDisplay">💰 0</span>
+        <span id="incomeDisplay">⏱️ +0/сек</span>
+    </div>
+    <div class="upgrades" id="upgradesContainer">
+        <!-- заполняется скриптом -->
+    </div>
+    <div class="footer" id="langDisplay">Язык: Русский</div>
+</div>
+
+<!-- SDK Яндекс Игр -->
+<script src="https://yandex.ru/games/sdk/v2"></script>
+
+<script>
+    // ==================== ПЕРЕВОДЫ ====================
+    const TRANSLATIONS = {
+        ru: {
+            title: 'Ферма-кликер',
+            clickHint: '🌾 Кликни, чтобы собрать',
+            coins: '💰 {0}',
+            income: '⏱️ +{0}/сек',
+            langLabel: 'Язык: Русский',
+            upgrades: [
+                { name: '🐄 Корова', desc: '+1 монета/сек', price: 10 },
+                { name: '🚜 Трактор', desc: '+5 монет/сек', price: 50 },
+                { name: '🌱 Удобрение', desc: '+1 к клику', price: 30 }
+            ],
+            buy: 'Купить'
+        },
+        en: {
+            title: 'Farm Clicker',
+            clickHint: '🌾 Click to harvest',
+            coins: '💰 {0}',
+            income: '⏱️ +{0}/sec',
+            langLabel: 'Language: English',
+            upgrades: [
+                { name: '🐄 Cow', desc: '+1 coin/sec', price: 10 },
+                { name: '🚜 Tractor', desc: '+5 coins/sec', price: 50 },
+                { name: '🌱 Fertilizer', desc: '+1 per click', price: 30 }
+            ],
+            buy: 'Buy'
+        },
+        tr: {
+            title: 'Çiftlik Tıklayıcı',
+            clickHint: '🌾 Hasat etmek için tıkla',
+            coins: '💰 {0}',
+            income: '⏱️ +{0}/sn',
+            langLabel: 'Dil: Türkçe',
+            upgrades: [
+                { name: '🐄 İnek', desc: '+1 madeni/sn', price: 10 },
+                { name: '🚜 Traktör', desc: '+5 madeni/sn', price: 50 },
+                { name: '🌱 Gübre', desc: 'Tıklama başına +1', price: 30 }
+            ],
+            buy: 'Satın Al'
+        }
+    };
+
+    // ==================== ИГРОВОЕ СОСТОЯНИЕ ====================
+    let game = {
+        coins: 0,
+        clickPower: 1,
+        income: 0, // в секунду
+        upgrades: [
+            { id: 0, level: 0, basePrice: 10, priceMultiplier: 1.5, incomeAdd: 1 },
+            { id: 1, level: 0, basePrice: 50, priceMultiplier: 1.6, incomeAdd: 5 },
+            { id: 2, level: 0, basePrice: 30, priceMultiplier: 1.4, clickAdd: 1 }
+        ]
+    };
+
+    let currentLang = 'ru';
+    let translations = TRANSLATIONS.ru;
+    let ysdk = null;
+
+    // ==================== ИНИЦИАЛИЗАЦИЯ SDK И ЯЗЫКА ====================
+    async function initPlatform() {
+        try {
+            ysdk = await YaGames.init();
+            const lang = ysdk.environment.i18n.lang; // 'ru', 'en', 'tr', ...
+            if (TRANSLATIONS[lang]) {
+                currentLang = lang;
+                translations = TRANSLATIONS[lang];
+            } else {
+                translations = TRANSLATIONS.ru;
+            }
+            console.log(`[Yandex] Язык: ${currentLang}`);
+        } catch (e) {
+            console.error('[Yandex] Ошибка SDK:', e);
+            translations = TRANSLATIONS.ru;
+        }
+        applyTranslations();
+        renderUpgrades();
+        updateUI();
+    }
+
+    // ==================== ПРИМЕНЕНИЕ ПЕРЕВОДОВ ====================
+    function applyTranslations() {
+        document.getElementById('title').textContent = translations.title;
+        document.getElementById('clickHint').textContent = translations.clickHint;
+        document.getElementById('langDisplay').textContent = translations.langLabel;
+        // Обновить кнопки покупки (будут пересозданы при renderUpgrades)
+    }
+
+    // ==================== UI ====================
+    function updateUI() {
+        document.getElementById('coinsDisplay').textContent =
+            translations.coins.replace('{0}', Math.floor(game.coins));
+        document.getElementById('incomeDisplay').textContent =
+            translations.income.replace('{0}', game.income.toFixed(1));
+        // Обновить состояние кнопок
+        document.querySelectorAll('.upgrade-item button').forEach((btn, idx) => {
+            const price = getUpgradePrice(idx);
+            btn.disabled = game.coins < price;
+        });
+    }
+
+    function getUpgradePrice(index) {
+        const upg = game.upgrades[index];
+        return Math.floor(upg.basePrice * Math.pow(upg.priceMultiplier, upg.level));
+    }
+
+    function renderUpgrades() {
+        const container = document.getElementById('upgradesContainer');
+        container.innerHTML = '';
+        const upgList = translations.upgrades;
+        game.upgrades.forEach((upg, idx) => {
+            const price = getUpgradePrice(idx);
+            const div = document.createElement('div');
+            div.className = 'upgrade-item';
+            div.innerHTML = `
+                <span class="desc">${upgList[idx].name} (${upgList[idx].desc})</span>
+                <span class="price">💰 ${price}</span>
+                <button data-idx="${idx}">${translations.buy}</button>
+            `;
+            container.appendChild(div);
+        });
+        // Навесить обработчики
+        container.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const idx = parseInt(e.target.dataset.idx);
+                buyUpgrade(idx);
+            });
+            btn.addEventListener('touchend', (e) => {
+                // предотвращаем дублирование
+            });
+        });
+        updateUI();
+    }
+
+    // ==================== ИГРОВАЯ ЛОГИКА ====================
+    function clickField() {
+        game.coins += game.clickPower;
+        updateUI();
+    }
+
+    function buyUpgrade(index) {
+        const price = getUpgradePrice(index);
+        if (game.coins < price) return;
+        game.coins -= price;
+        const upg = game.upgrades[index];
+        upg.level++;
+        // Применяем эффект
+        if (upg.incomeAdd) {
+            game.income += upg.incomeAdd;
+        }
+        if (upg.clickAdd) {
+            game.clickPower += upg.clickAdd;
+        }
+        // Перерисовываем цены (они изменились)
+        renderUpgrades();
+        updateUI();
+    }
+
+    // Авто-доход
+    setInterval(() => {
+        if (game.income > 0) {
+            game.coins += game.income / 10; // каждые 100 мс добавляем долю
+            updateUI();
+        }
+    }, 100);
+
+    // ==================== ОБРАБОТЧИКИ СОБЫТИЙ ====================
+    document.getElementById('clickField').addEventListener('click', clickField);
+    document.getElementById('clickField').addEventListener('touchend', (e) => {
+        e.preventDefault();
+        clickField();
+    });
+
+    // ==================== ЗАПУСК ====================
+    initPlatform();
+</script>
+</body>
+</html>
