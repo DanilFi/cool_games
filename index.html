@@ -19,7 +19,8 @@
         .debug { color: #888; font-size: 12px; margin-top: 10px; }
         .lang-indicator { color: #ff0000; font-size: 14px; font-weight: bold; margin-top: 10px; }
         #loading { font-size: 20px; margin-top: 40px; color: #aaa; }
-        /* Стиль кнопки продвижения */
+        
+        /* Кнопка продвижения (зелёная) */
         #promoBtn {
             display: none;
             padding: 15px;
@@ -35,26 +36,136 @@
             transition: 0.2s;
         }
         #promoBtn:active { transform: scale(0.95); }
+
+        /* ===== СТИЛИ ДЛЯ МОДАЛЬНОГО ОКНА "ПОДЕЛИТЬСЯ" ===== */
+        .share-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .share-modal {
+            background: #2a2a2a;
+            padding: 25px 20px 20px 20px;
+            border-radius: 16px;
+            max-width: 320px;
+            width: 90%;
+            text-align: center;
+            color: white;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .share-modal h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 18px;
+            color: #ccc;
+        }
+        .share-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+        }
+        .share-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #3a3a3a;
+            border: none;
+            border-radius: 12px;
+            padding: 12px 16px;
+            min-width: 70px;
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+            transition: transform 0.1s;
+            text-decoration: none;
+        }
+        .share-btn:active { transform: scale(0.95); }
+        .share-btn .icon-placeholder {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            margin-bottom: 6px;
+            background: #555;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+        .share-btn.youtube .icon-placeholder { background: #FF0000; }
+        .share-btn.tiktok .icon-placeholder { background: #000000; border: 2px solid #25F4EE; }
+        .share-btn.telegram .icon-placeholder { background: #0088cc; }
+        .share-btn.vk .icon-placeholder { background: #0077ff; }
+        .share-btn.copy .icon-placeholder { background: #555; }
+
+        .share-close {
+            margin-top: 20px;
+            background: #444;
+            border: none;
+            color: #aaa;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .share-close:active { background: #555; }
     </style>
     <script src="https://yandex.ru/games/sdk/v2/"></script>
 </head>
 <body>
 
-    <!-- Меню -->
+    <!-- ===== МЕНЮ ===== -->
     <div id="menu">
         <h2 id="menuTitle">Выберите игру:</h2>
         <div id="gamesGrid"></div>
         <div id="loading">⏳ Загрузка...</div>
         <div class="debug" id="debugInfo"></div>
         <div class="lang-indicator" id="langIndicator">Язык: ...</div>
-        <!-- Кнопка продвижения -->
+        <!-- Кнопка продвижения (появится автоматически) -->
         <button id="promoBtn">🚀 Продвинуть новую игру</button>
     </div>
 
-    <!-- Игровой контейнер -->
+    <!-- ===== ИГРОВОЙ КОНТЕЙНЕР ===== -->
     <div id="gameContainer">
         <button id="backButton" onclick="backToMenu()">⬅ В меню</button>
         <iframe id="gameFrame" src="" allow="autoplay; fullscreen"></iframe>
+    </div>
+
+    <!-- ===== МОДАЛЬНОЕ ОКНО "ПОДЕЛИТЬСЯ" ===== -->
+    <div class="share-overlay" id="shareOverlay">
+        <div class="share-modal">
+            <h3>📤 Поделиться игрой</h3>
+            <div class="share-buttons">
+                <button class="share-btn youtube" data-share="youtube">
+                    <span class="icon-placeholder">▶️</span>
+                    YouTube
+                </button>
+                <button class="share-btn tiktok" data-share="tiktok">
+                    <span class="icon-placeholder">🎵</span>
+                    TikTok
+                </button>
+                <button class="share-btn telegram" data-share="telegram">
+                    <span class="icon-placeholder">✈️</span>
+                    Telegram
+                </button>
+                <button class="share-btn vk" data-share="vk">
+                    <span class="icon-placeholder">📱</span>
+                    VK
+                </button>
+                <button class="share-btn copy" data-share="copy">
+                    <span class="icon-placeholder">📋</span>
+                    Копировать
+                </button>
+            </div>
+            <button class="share-close" id="shareCloseBtn">Закрыть</button>
+        </div>
     </div>
 
     <script>
@@ -62,34 +173,14 @@
         // 1. ПЕРЕВОДЫ
         // ============================================================
         const TRANSLATIONS = {
-            ru: {
-                title: 'Выберите игру:',
-                back: '⬅ В меню',
-                loading: 'Загрузка...',
-                loaded: '✅ Загружено игр: '
-            },
-            en: {
-                title: 'Choose a game:',
-                back: '⬅ Back to menu',
-                loading: 'Loading...',
-                loaded: '✅ Games loaded: '
-            },
-            tr: {
-                title: 'Bir oyun seçin:',
-                back: '⬅ Menüye dön',
-                loading: 'Yükleniyor...',
-                loaded: '✅ Oyunlar yüklendi: '
-            },
-            kk: {
-                title: 'Ойынды таңдаңыз:',
-                back: '⬅ Мәзірге оралу',
-                loading: 'Жүктелуде...',
-                loaded: '✅ Ойындар жүктелді: '
-            }
+            ru: { title: 'Выберите игру:', back: '⬅ В меню', loading: 'Загрузка...', loaded: '✅ Загружено игр: ' },
+            en: { title: 'Choose a game:', back: '⬅ Back to menu', loading: 'Loading...', loaded: '✅ Games loaded: ' },
+            tr: { title: 'Bir oyun seçin:', back: '⬅ Menüye dön', loading: 'Yükleniyor...', loaded: '✅ Oyunlar yüklendi: ' },
+            kk: { title: 'Ойынды таңдаңыз:', back: '⬅ Мәзірге оралу', loading: 'Жүктелуде...', loaded: '✅ Ойындар жүктелді: ' }
         };
 
         // ============================================================
-        // 2. ОПРЕДЕЛЕНИЕ ЯЗЫКА (через SDK с таймаутом)
+        // 2. ИНИЦИАЛИЗАЦИЯ SDK (с проверкой на существование)
         // ============================================================
         let currentLang = 'ru';
         let translations = TRANSLATIONS.ru;
@@ -102,6 +193,14 @@
                     console.warn('SDK таймаут, используем fallback');
                     resolve(null);
                 }, timeoutMs);
+
+                if (typeof YaGames === 'undefined') {
+                    console.warn('YaGames не определён, используем fallback');
+                    clearTimeout(timer);
+                    resolve(null);
+                    return;
+                }
+
                 YaGames.init()
                     .then(sdk => {
                         clearTimeout(timer);
@@ -160,7 +259,7 @@
             renderGames();
             debugEl.textContent = translations.loaded + GAMES.length;
 
-            // ===== ВАЖНО: проверяем новые игры и показываем кнопку =====
+            // Проверяем новые игры для продвижения
             checkAndShowPromo();
 
             console.log(`Лаунчер загружен, язык: ${currentLang}`);
@@ -173,7 +272,6 @@
             { id: "game_ferms", title: "Ферма-кликер", icon: "icon.png", file: "game.html" },
             { id: "game2", title: "Тех-специалист", icon: "icon.png", file: "game.html" },
             { id: "game3", title: "Тест", icon: "icon.png", file: "game.html" }
-            // добавьте другие игры
         ];
 
         // ============================================================
@@ -182,7 +280,6 @@
         function renderGames() {
             const grid = document.getElementById('gamesGrid');
             grid.innerHTML = '';
-
             GAMES.forEach(game => {
                 const card = document.createElement('div');
                 card.className = 'game-card';
@@ -230,15 +327,13 @@
         }
 
         // ============================================================
-        // 6. ОБРАБОТКА СООБЩЕНИЙ ОТ ИГР (реклама, сохранения)
+        // 6. ОБРАБОТКА СООБЩЕНИЙ (реклама, сохранения)
         // ============================================================
         window.addEventListener('message', function(event) {
             const frame = document.getElementById('gameFrame');
             if (!frame || !frame.contentWindow) return;
             const data = event.data;
             if (!data || typeof data !== 'object') return;
-
-            console.log('Сообщение от игры:', data);
 
             if (data.type === 'SHOW_REKLAMA' && ysdk) {
                 ysdk.adv.showFullscreenAdv({
@@ -278,7 +373,7 @@
         });
 
         // ============================================================
-        // 7. ПРОДВИЖЕНИЕ НОВЫХ ИГР (автоматическое)
+        // 7. АВТОПРОДВИЖЕНИЕ НОВЫХ ИГР (с новым меню "Поделиться")
         // ============================================================
         const STORAGE_KEY = 'promoted_games';
 
@@ -311,9 +406,11 @@
             }
         }
 
+        // === Глобальная переменная для хранения текущей новой игры ===
+        let currentNewGame = null;
+
         function checkAndShowPromo() {
             const promoBtn = document.getElementById('promoBtn');
-            // Показываем только на GitHub Pages или localhost (для теста)
             const host = window.location.hostname;
             const isAllowed = host.includes('github.io') || host === 'localhost' || host === '127.0.0.1';
             if (!isAllowed) {
@@ -324,62 +421,106 @@
             const newGames = getNewGames();
             if (newGames.length === 0) {
                 promoBtn.style.display = 'none';
+                currentNewGame = null;
                 return;
             }
 
-            // Берём последнюю новую игру (ту, что добавили недавно)
-            const newGame = newGames[newGames.length - 1];
-            promoBtn.textContent = `🚀 Продвинуть новую игру: "${newGame.title}"`;
+            // Берём последнюю новую игру
+            currentNewGame = newGames[newGames.length - 1];
+            promoBtn.textContent = `🚀 Продвинуть новую игру: "${currentNewGame.title}"`;
             promoBtn.style.display = 'block';
 
-            // Убираем старые обработчики, чтобы не дублировать
+            // Убираем старые обработчики
             const newBtn = promoBtn.cloneNode(true);
             promoBtn.parentNode.replaceChild(newBtn, promoBtn);
 
-            newBtn.onclick = async function() {
-                const shareData = {
-                    title: `Новая игра: ${newGame.title}`,
-                    text: `🔥 Играй в "${newGame.title}" бесплатно! Ссылка: ${window.location.href}`,
-                    url: window.location.href
-                };
-
-                // Пытаемся использовать Web Share API (мобильные)
-                if (navigator.share) {
-                    try {
-                        await navigator.share(shareData);
-                        // После успешного шаринга скрываем и отмечаем
-                        markAsPromoted(newGame.id);
-                        newBtn.style.display = 'none';
-                        return;
-                    } catch (err) {
-                        if (err.name !== 'AbortError') {
-                            console.warn('Ошибка шаринга:', err);
-                        }
-                        // Если отмена — не скрываем кнопку
-                        return;
-                    }
-                }
-
-                // Если Web Share недоступен — копируем в буфер
-                try {
-                    await navigator.clipboard.writeText(shareData.text);
-                    alert('✅ Ссылка скопирована! Отправьте её друзьям.');
-                    markAsPromoted(newGame.id);
-                    newBtn.style.display = 'none';
-                } catch (clipErr) {
-                    // Если и копирование не работает — показываем текст вручную
-                    prompt('Скопируйте ссылку вручную:', shareData.text);
-                    // Всё равно считаем продвинутым
-                    markAsPromoted(newGame.id);
-                    newBtn.style.display = 'none';
-                }
+            // При клике на кнопку открываем модальное окно "Поделиться"
+            newBtn.onclick = function(e) {
+                e.preventDefault();
+                openShareModal();
             };
         }
 
         // ============================================================
-        // 8. ЗАПУСК
+        // 8. МОДАЛЬНОЕ ОКНО "ПОДЕЛИТЬСЯ"
+        // ============================================================
+        const overlay = document.getElementById('shareOverlay');
+        const closeBtn = document.getElementById('shareCloseBtn');
+        const shareButtons = document.querySelectorAll('.share-btn[data-share]');
+
+        function openShareModal() {
+            if (!currentNewGame) {
+                alert('Нет новых игр для продвижения.');
+                return;
+            }
+            overlay.style.display = 'flex';
+        }
+
+        function closeShareModal() {
+            overlay.style.display = 'none';
+        }
+
+        // Закрытие по клику на фон
+        overlay.addEventListener('click', function(e) {
+            if (e.target === overlay) {
+                closeShareModal();
+            }
+        });
+
+        closeBtn.addEventListener('click', closeShareModal);
+
+        // Обработчики для кнопок соцсетей
+        shareButtons.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const type = this.dataset.share;
+                const gameTitle = currentNewGame ? currentNewGame.title : 'игра';
+                const shareText = `🔥 Играй в "${gameTitle}" бесплатно! Ссылка: ${window.location.href}`;
+                const shareUrl = window.location.href;
+
+                switch (type) {
+                    case 'youtube':
+                        window.open(`https://www.youtube.com/post?text=${encodeURIComponent(shareText)}`, '_blank');
+                        break;
+                    case 'tiktok':
+                        navigator.clipboard.writeText(shareText).then(() => {
+                            alert('✅ Текст скопирован! Откройте TikTok и вставьте его в описание видео или комментарий.');
+                        }).catch(() => {
+                            prompt('Скопируйте текст вручную:', shareText);
+                        });
+                        break;
+                    case 'telegram':
+                        window.open(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`, '_blank');
+                        break;
+                    case 'vk':
+                        window.open(`https://vk.com/share.php?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(shareText)}`, '_blank');
+                        break;
+                    case 'copy':
+                        navigator.clipboard.writeText(shareText).then(() => {
+                            alert('✅ Ссылка скопирована!');
+                        }).catch(() => {
+                            prompt('Скопируйте текст вручную:', shareText);
+                        });
+                        break;
+                    default:
+                        return;
+                }
+
+                // После выбора соцсети помечаем игру как продвинутую и скрываем кнопку
+                if (currentNewGame) {
+                    markAsPromoted(currentNewGame.id);
+                    const promoBtn = document.getElementById('promoBtn');
+                    promoBtn.style.display = 'none';
+                    currentNewGame = null;
+                }
+                closeShareModal();
+            });
+        });
+
+        // ============================================================
+        // 9. ЗАПУСК
         // ============================================================
         initApp();
     </script>
 </body>
-</html>
+                                      </html>
