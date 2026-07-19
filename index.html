@@ -23,6 +23,16 @@
     <script src="https://yandex.ru/games/sdk/v2/"></script>
 </head>
 <body>
+    <!-- Подключаем правильную рабочую ссылку на библиотеку GIF -->
+<script src="https://cloudflare.com"></script>
+
+<!-- Кнопка продвижения -->
+<button id="promoBtn" style="display:none; padding: 15px; background: #00ff66; border: none; font-weight: bold; border-radius: 8px; margin: 10px auto; width: 90%;">
+   🚀 Продвинуть новую игру в 1 клик (Только для GitHub)
+</button>
+
+
+    
     <!-- Меню -->
     <div id="menu">
         <h2 id="menuTitle">Выберите игру:</h2>
@@ -38,6 +48,80 @@
         <iframe id="gameFrame" src="" allow="autoplay; fullscreen"></iframe>
     </div>
 
+    <script>
+// Исправленная и безопасная функция конвертации файла
+function dataURLtoFile(dataurl, filename) {
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, {type: mime});
+}
+
+function initMobilePromotion(gameName, gameUrl) {
+    // ПРОВЕРКА ДОМЕНА: Если мы НЕ на GitHub Pages, полностью останавливаем работу функции
+    if (!window.location.hostname.includes('github.io')) {
+        console.log('Кнопка продвижения скрыта, так как игра запущена не на GitHub Pages.');
+        return; 
+    }
+
+    const promoButton = document.getElementById('promoBtn');
+    promoButton.style.display = 'block'; // Показываем кнопку только на GitHub
+
+    const message = `🔥 Новая игра "${gameName}"! Играй на телефоне в браузере: ${gameUrl} #games #mobile`;
+
+    // Создаем GIF
+    gifshot.createGIF({
+        gifWidth: 360,
+        gifHeight: 640,
+        interval: 0.2,
+        numFrames: 5,
+        text: `НОВАЯ ИГРА!\n\n"${gameName.toUpperCase()}"\n\nССЫЛКА ТУТ`,
+        fontWeight: 'bold',
+        fontSize: '28px',
+        fontColor: '#ffffff',
+        textAlign: 'center',
+        textBaseline: 'middle'
+    }, function (obj) {
+        if (!obj.error) {
+            const gifFile = dataURLtoFile(obj.image, 'promo.gif');
+
+            promoButton.onclick = async () => {
+                if (navigator.canShare && navigator.canShare({ files: [gifFile] })) {
+                    try {
+                        await navigator.share({
+                            files: [gifFile],
+                            title: `Новая игра: ${gameName}`,
+                            text: message
+                        });
+                    } catch (error) {
+                        console.log('Отмена отправки');
+                    }
+                } else {
+                    navigator.clipboard.writeText(message);
+                    alert('Текст скопирован! Открываю TikTok.');
+                    window.location.href = 'snssdk1128://';
+                }
+            };
+        }
+    });
+}
+
+// ВАШ МАССИВ ДЛЯ ПРОВЕРКИ
+let games = [];
+function onNewGameAddedMobile(gameData) {
+    games.push(gameData);
+    initMobilePromotion(gameData.name, gameData.url);
+}
+
+// Автоматический тест при загрузке страницы
+// onNewGameAddedMobile({ name: "Тапалка 2026", url: "https://yandex.ru" });
+    </script>
+    
     <script>
         // ============================================================
         // 1. ПЕРЕВОДЫ (поддерживаем те же языки, что и в хоккее + kk)
