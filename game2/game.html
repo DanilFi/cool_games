@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Симулятор техспециалиста</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+        body {
+            background: #0d1b2a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            touch-action: none;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #1a2a3a;
+        }
+        #game-panel {
+            background: #1a472a;
+            border-radius: 12px;
+            box-shadow: 0 0 40px rgba(0,0,0,0.7);
+            max-width: 600px;
+            width: 95%;
+            max-height: 95%;
+            padding: 20px;
+            color: white;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 400px;
+        }
+        #score {
+            font-size: 28px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.4);
+            padding: 8px 24px;
+            border-radius: 20px;
+            letter-spacing: 2px;
+            width: 100%;
+        }
+        #problem {
+            font-size: 22px;
+            margin: 20px 0;
+            padding: 10px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+        #options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            width: 100%;
+            margin: 10px 0;
+        }
+        .option-btn {
+            background: #2a5a3a;
+            border: 2px solid #4a8a5a;
+            border-radius: 8px;
+            color: white;
+            font-size: 18px;
+            padding: 14px 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            touch-action: manipulation;
+        }
+        .option-btn:hover {
+            background: #3a7a4a;
+            transform: scale(1.02);
+        }
+        .option-btn:active {
+            transform: scale(0.95);
+        }
+        .option-btn.correct {
+            background: #2a8a2a;
+            border-color: #6afa6a;
+        }
+        .option-btn.wrong {
+            background: #8a2a2a;
+            border-color: #fa6a6a;
+        }
+        #message {
+            font-size: 36px;
+            font-weight: bold;
+            text-shadow: 0 0 30px rgba(255,215,0,0.5);
+            background: rgba(0,0,0,0.6);
+            padding: 20px 40px;
+            border-radius: 16px;
+            margin-top: 10px;
+            display: none;
+        }
+        #message:not(:empty) {
+            display: block;
+        }
+        #restart-hint {
+            font-size: 16px;
+            color: #ccc;
+            margin-top: 10px;
+        }
+        @media (max-width: 500px) {
+            #score { font-size: 20px; padding: 4px 16px; }
+            #problem { font-size: 18px; }
+            .option-btn { font-size: 15px; padding: 10px 6px; }
+            #message { font-size: 26px; padding: 12px 24px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="game-panel">
+            <div id="score">0 / 5</div>
+            <div id="problem">Загружаем задачу...</div>
+            <div id="options">
+                <button class="option-btn" data-index="0">—</button>
+                <button class="option-btn" data-index="1">—</button>
+                <button class="option-btn" data-index="2">—</button>
+                <button class="option-btn" data-index="3">—</button>
+            </div>
+            <div id="message"></div>
+            <div id="restart-hint">Нажмите ПРОБЕЛ для перезапуска</div>
+        </div>
+    </div>
+
+    <script src="https://yandex.ru/games/sdk/v2"></script>
+    <script>
+        // ============================================================
+        // 1. ПЕРЕВОДЫ И ЗАДАЧИ
+        // ============================================================
+        const TASKS = {
+            ru: [
+                { problem: 'Компьютер не включается', options: ['Проверить питание', 'Заменить процессор', 'Переустановить Windows', 'Очистить от пыли'], correct: 0 },
+                { problem: 'Появился синий экран', options: ['Обновить драйверы', 'Заменить видеокарту', 'Переустановить ОС', 'Проверить жесткий диск'], correct: 0 },
+                { problem: 'Медленно работает', options: ['Очистить систему от мусора', 'Установить больше ОЗУ', 'Заменить процессор', 'Переустановить Windows'], correct: 0 },
+                { problem: 'Нет интернета', options: ['Перезагрузить роутер', 'Переустановить сетевой драйвер', 'Проверить кабель', 'Заменить сетевую карту'], correct: 0 },
+                { problem: 'Компьютер перегревается', options: ['Очистить от пыли', 'Установить дополнительный кулер', 'Заменить термопасту', 'Снизить частоту процессора'], correct: 0 }
+            ],
+            en: [
+                { problem: 'Computer does not turn on', options: ['Check power supply', 'Replace CPU', 'Reinstall Windows', 'Clean from dust'], correct: 0 },
+                { problem: 'Blue screen appears', options: ['Update drivers', 'Replace video card', 'Reinstall OS', 'Check hard drive'], correct: 0 },
+                { problem: 'Slow performance', options: ['Clean system junk', 'Install more RAM', 'Replace CPU', 'Reinstall Windows'], correct: 0 },
+                { problem: 'No internet', options: ['Restart router', 'Reinstall network driver', 'Check cable', 'Replace network card'], correct: 0 },
+                { problem: 'Computer overheating', options: ['Clean from dust', 'Install additional fan', 'Replace thermal paste', 'Lower CPU frequency'], correct: 0 }
+            ],
+            tr: [
+                { problem: 'Bilgisayar açılmıyor', options: ['Güç kaynağını kontrol et', 'İşlemciyi değiştir', 'Windows\'u yeniden yükle', 'Tozdan temizle'], correct: 0 },
+                { problem: 'Mavi ekran hatası', options: ['Sürücüleri güncelle', 'Ekran kartını değiştir', 'İşletim sistemini yeniden yükle', 'Sabit diski kontrol et'], correct: 0 },
+                { problem: 'Yavaş çalışıyor', options: ['Sistem gereksiz dosyalarını temizle', 'Daha fazla RAM tak', 'İşlemciyi değiştir', 'Windows\'u yeniden yükle'], correct: 0 },
+                { problem: 'İnternet yok', options: ['Modemi yeniden başlat', 'Ağ sürücüsünü yeniden yükle', 'Kabloyu kontrol et', 'Ağ kartını değiştir'], correct: 0 },
+                { problem: 'Bilgisayar aşırı ısınıyor', options: ['Tozdan temizle', 'Ekstra fan tak', 'Termal macunu değiştir', 'İşlemci frekansını düşür'], correct: 0 }
+            ]
+        };
+
+        const TRANSLATIONS = {
+            ru: { win: '🏆 Победа! Нажмите ПРОБЕЛ', title: 'Симулятор техспециалиста' },
+            en: { win: '🏆 Victory! Press SPACE', title: 'Tech Support Simulator' },
+            tr: { win: '🏆 Zafer! SPACE tuşuna basın', title: 'Teknik Destek Simülatörü' }
+        };
+
+        // ============================================================
+        // 2. ИНИЦИАЛИЗАЦИЯ SDK И АВТООПРЕДЕЛЕНИЕ ЯЗЫКА
+        // ============================================================
+        let currentLang = 'ru';
+        let translations = TRANSLATIONS.ru;
+        let tasks = TASKS.ru;
+        let ysdk = null;
+
+        async function initSDK() {
+            try {
+                ysdk = await YaGames.init();
+                const lang = ysdk.environment.i18n.lang;
+                if (TRANSLATIONS[lang]) {
+                    currentLang = lang;
+                    translations = TRANSLATIONS[lang];
+                    tasks = TASKS[lang] || TASKS.ru;
+                } else {
+                    translations = TRANSLATIONS.ru;
+                    tasks = TASKS.ru;
+                }
+                console.log(`SDK инициализирован. Язык: ${currentLang}`);
+            } catch (e) {
+                console.error('Ошибка инициализации SDK:', e);
+                translations = TRANSLATIONS.ru;
+                tasks = TASKS.ru;
+            }
+            updateUI();
+        }
+
+        // ============================================================
+        // 3. ИГРОВАЯ ЛОГИКА
+        // ============================================================
+        let score = 0;
+        let currentTaskIndex = 0;
+        let gameOver = false;
+        let taskList = [];
+
+        const scoreEl = document.getElementById('score');
+        const problemEl = document.getElementById('problem');
+        const optionsEl = document.getElementById('options');
+        const messageEl = document.getElementById('message');
+        const optionBtns = document.querySelectorAll('.option-btn');
+        const restartHint = document.getElementById('restart-hint');
+
+        function shuffleArray(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function initGame() {
+            score = 0;
+            gameOver = false;
+            messageEl.textContent = '';
+            messageEl.style.display = 'none';
+            // Перемешиваем задачи и берём первые 5 (или все)
+            taskList = shuffleArray([...tasks]);
+            if (taskList.length === 0) taskList = tasks; // fallback
+            currentTaskIndex = 0;
+            optionBtns.forEach(btn => {
+                btn.classList.remove('correct', 'wrong');
+                btn.disabled = false;
+            });
+            showTask();
+            updateScore();
+        }
+
+        function showTask() {
+            if (currentTaskIndex >= taskList.length || gameOver) return;
+            const task = taskList[currentTaskIndex];
+            problemEl.textContent = task.problem;
+            optionBtns.forEach((btn, i) => {
+                btn.textContent = task.options[i] || '—';
+                btn.dataset.correct = (i === task.correct) ? 'true' : 'false';
+                btn.classList.remove('correct', 'wrong');
+                btn.disabled = false;
+            });
+        }
+
+        function updateScore() {
+            scoreEl.textContent = `${score} / 5`;
+        }
+
+        function handleOptionClick(e) {
+            const btn = e.currentTarget;
+            if (gameOver || btn.disabled) return;
+
+            const isCorrect = btn.dataset.correct === 'true';
+            // Блокируем все кнопки
+            optionBtns.forEach(b => b.disabled = true);
+
+            if (isCorrect) {
+                btn.classList.add('correct');
+                score++;
+                updateScore();
+                if (score >= 5) {
+                    // Победа
+                    gameOver = true;
+                    messageEl.textContent = translations.win;
+                    messageEl.style.display = 'block';
+                    optionBtns.forEach(b => b.disabled = true);
+                    return;
+                }
+                // Следующая задача через небольшую задержку
+                setTimeout(() => {
+                    currentTaskIndex++;
+                    if (currentTaskIndex < taskList.length) {
+                        showTask();
+                    } else {
+                        // Задачи кончились, но победа ещё не достигнута – перемешиваем заново
+                        taskList = shuffleArray([...tasks]);
+                        currentTaskIndex = 0;
+                        showTask();
+                    }
+                    optionBtns.forEach(b => b.disabled = false);
+                }, 400);
+            } else {
+                btn.classList.add('wrong');
+                // Штраф: уменьшаем счёт, но не ниже 0
+                score = Math.max(0, score - 1);
+                updateScore();
+                // Разблокируем через полсекунды, но разрешаем выбрать другую кнопку? 
+                // По правилам, после ошибки переходим к следующей задаче (или даём ещё попытку?)
+                // Для простоты – переходим к следующей задаче, но с потерей очка.
+                setTimeout(() => {
+                    currentTaskIndex++;
+                    if (currentTaskIndex < taskList.length) {
+                        showTask();
+                    } else {
+                        taskList = shuffleArray([...tasks]);
+                        currentTaskIndex = 0;
+                        showTask();
+                    }
+                    optionBtns.forEach(b => {
+                        b.disabled = false;
+                        b.classList.remove('correct', 'wrong');
+                    });
+                }, 500);
+            }
+        }
+
+        optionBtns.forEach(btn => {
+            btn.addEventListener('click', handleOptionClick);
+            btn.addEventListener('touchstart', (e) => {
+                // чтобы на мобильных работало без задержки
+                e.preventDefault();
+                handleOptionClick(e);
+            }, { passive: false });
+        });
+
+        // Перезапуск по пробелу / Enter
+        document.addEventListener('keydown', (e) => {
+            if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                if (gameOver || score >= 5) {
+                    initGame();
+                }
+            }
+        });
+
+        // Перезапуск по клику на сообщение (для мобильных)
+        messageEl.addEventListener('click', () => {
+            if (gameOver || score >= 5) {
+                initGame();
+            }
+        });
+
+        // ============================================================
+        // 4. ЗАПУСК
+        // ============================================================
+        function updateUI() {
+            // При необходимости обновить заголовок
+            document.title = translations.title;
+            restartHint.textContent = gameOver ? translations.win : 'Нажмите ПРОБЕЛ для перезапуска';
+        }
+
+        initSDK().then(() => {
+            initGame();
+            updateUI();
+        }).catch(() => {
+            translations = TRANSLATIONS.ru;
+            tasks = TASKS.ru;
+            initGame();
+            updateUI();
+        });
+    </script>
+</body>
+</html>
