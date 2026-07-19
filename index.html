@@ -18,8 +18,8 @@
         #backButton { position: absolute; top: 10px; left: 10px; padding: 10px 15px; background: #ff3b30; color: white; border: none; border-radius: 5px; z-index: 10; font-weight: bold; cursor: pointer; }
         .debug { color: #888; font-size: 12px; margin-top: 10px; }
         .lang-indicator { color: #ff0000; font-size: 14px; font-weight: bold; margin-top: 10px; }
+        #loading { font-size: 20px; margin-top: 40px; color: #aaa; }
     </style>
-    <!-- SDK подключаем, но инициализируем асинхронно -->
     <script src="https://yandex.ru/games/sdk/v2/"></script>
 </head>
 <body>
@@ -27,7 +27,8 @@
     <div id="menu">
         <h2 id="menuTitle">Выберите игру:</h2>
         <div id="gamesGrid"></div>
-        <div class="debug" id="debugInfo">Загрузка...</div>
+        <div id="loading">⏳ Загрузка...</div>
+        <div class="debug" id="debugInfo"></div>
         <div class="lang-indicator" id="langIndicator">Язык: ...</div>
     </div>
 
@@ -39,7 +40,7 @@
 
     <script>
         // ============================================================
-        // 1. ПЕРЕВОДЫ
+        // 1. ПЕРЕВОДЫ (поддерживаем те же языки, что и в хоккее + kk)
         // ============================================================
         const TRANSLATIONS = {
             ru: {
@@ -69,16 +70,104 @@
         };
 
         // ============================================================
-        // 2. ОПРЕДЕЛЕНИЕ ЯЗЫКА БЕЗ SDK (мгновенно)
+        // 2. ИНИЦИАЛИЗАЦИЯ SDK И ОПРЕДЕЛЕНИЕ ЯЗЫКА (как в хоккее)
         // ============================================================
-        function detectLanguage() {
+        let currentLang = 'ru';
+        let translations = TRANSLATIONS.ru;
+        let ysdk = null;
+        let player = null;
+
+        // Функция, которая пытается инициализировать SDK с таймаутом
+        function initSDKWithTimeout(timeoutMs = 3000) {
+            return new Promise((resolve) => {
+                // Таймер
+                const timer = setTimeout(() => {
+                    console.warn('SDK инициализация превысила таймаут, используем fallback');
+                    resolve(null);
+                }, timeoutMs);
+
+                // Пытаемся инициализировать SDK
+                YaGames.init()
+                    .then(sdk => {
+                        clearTimeout(timer);
+                        resolve(sdk);
+                    })
+                    .catch(err => {
+                        clearTimeout(timer);
+                        console.warn('Ошибка инициализации SDK:', err);
+                        resolve(null);
+                    });
+            });
+        }
+
+        // Основная функция запуска приложения
+        async function initApp() {
+            // Показываем загрузку
+            const loadingEl = document.getElementById('loading');
+            const gridEl = document.getElementById('gamesGrid');
+            const debugEl = document.getElementById('debugInfo');
+            const langIndicator = document.getElementById('langIndicator');
+
+            // Пытаемся получить SDK (с таймаутом)
+            const sdk = await initSDKWithTimeout(3000);
+            let lang = 'ru';
+
+            if (sdk) {
+                ysdk = sdk;
+                console.log('SDK инициализирован');
+
+                // Определяем язык через SDK (как в хоккее)
+                try {
+                    const sdkLang = ysdk.environment.i18n.lang; // 'ru', 'en', 'tr', 'kk' ...
+                    if (TRANSLATIONS[sdkLang]) {
+                        lang = sdkLang;
+                    } else {
+                        lang = 'ru';
+                    }
+                } catch (e) {
+                    console.warn('Не удалось получить язык из SDK, используем fallback');
+                    lang = detectFallbackLanguage();
+                }
+
+                // Получаем игрока (опционально)
+                try {
+                    player = await ysdk.getPlayer({ scopes: false });
+                    console.log('Игрок получен');
+                } catch (e) {
+                    console.warn('Игрок не авторизован');
+                }
+            } else {
+                // Если SDK не инициализирован – используем fallback (как в хоккее при ошибке)
+                console.warn('SDK не доступен, используем fallback-язык');
+                lang = detectFallbackLanguage();
+            }
+
+            // Устанавливаем язык и переводы
+            currentLang = lang;
+            translations = TRANSLATIONS[currentLang] || TRANSLATIONS.ru;
+
+            // Обновляем UI
+            document.getElementById('menuTitle').textContent = translations.title;
+            document.getElementById('backButton').textContent = translations.back;
+            langIndicator.textContent = `Язык: ${currentLang}`;
+
+            // Скрываем загрузку, показываем сетку
+            loadingEl.style.display = 'none';
+            gridEl.style.display = 'flex';
+
+            // Отрисовываем карточки игр
+            renderGames();
+
+            debugEl.textContent = translations.loaded + GAMES.length;
+            console.log(`Лаунчер загружен, язык: ${currentLang}`);
+        }
+
+        // Fallback: определяем язык из браузера
+        function detectFallbackLanguage() {
             const navLang = navigator.language || navigator.userLanguage || 'ru';
             const langCode = navLang.substr(0, 2).toLowerCase();
             return TRANSLATIONS[langCode] ? langCode : 'ru';
         }
-
-        let currentLang = detectLanguage();
-        let translations = TRANSLATIONS[currentLang] || TRANSLATIONS.ru;
 
         // ============================================================
         // 3. КОНФИГУРАЦИЯ ИГР (локальные файлы)
@@ -90,12 +179,11 @@
         ];
 
         // ============================================================
-        // 4. ОТРИСОВКА КАРТОЧЕК (вызывается СРАЗУ, до SDK)
+        // 4. ОТРИСОВКА КАРТОЧЕК
         // ============================================================
         function renderGames() {
             const grid = document.getElementById('gamesGrid');
             grid.innerHTML = '';
-            const debug = document.getElementById('debugInfo');
 
             GAMES.forEach(game => {
                 const card = document.createElement('div');
@@ -120,56 +208,10 @@
 
                 grid.appendChild(card);
             });
-
-            debug.textContent = translations.loaded + GAMES.length;
         }
 
-        // Вызываем renderGames немедленно
-        renderGames();
-
         // ============================================================
-        // 5. ОБНОВЛЕНИЕ UI (язык) - тоже сразу
-        // ============================================================
-        function updateUI() {
-            document.getElementById('menuTitle').textContent = translations.title;
-            document.getElementById('backButton').textContent = translations.back;
-            document.getElementById('langIndicator').textContent = `Язык: ${currentLang}`;
-        }
-        updateUI();
-
-        // ============================================================
-        // 6. ИНИЦИАЛИЗАЦИЯ SDK В ФОНЕ (с таймаутом) - не блокирует
-        // ============================================================
-        let ysdk = null;
-        let player = null;
-
-        function initSDK() {
-            // Проверяем, определён ли YaGames
-            if (typeof YaGames === 'undefined') {
-                console.warn('YaGames не определён, SDK не будет инициализирован');
-                return;
-            }
-            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('SDK timeout')), 3000));
-
-            Promise.race([YaGames.init(), timeout])
-                .then(sdk => {
-                    ysdk = sdk;
-                    console.log('SDK инициализирован');
-                    return ysdk.getPlayer({ scopes: false }).then(p => {
-                        player = p;
-                        console.log('Игрок получен');
-                    }).catch(() => {});
-                })
-                .catch(err => {
-                    console.warn('SDK не инициализирован (таймаут или ошибка):', err);
-                });
-        }
-
-        // Запускаем SDK параллельно (не дожидаемся)
-        initSDK();
-
-        // ============================================================
-        // 7. ЗАПУСК ИГРЫ (с передачей языка)
+        // 5. ЗАПУСК ИГРЫ (с передачей языка)
         // ============================================================
         function launchGame(gameId) {
             const game = GAMES.find(g => g.id === gameId);
@@ -189,7 +231,7 @@
         }
 
         // ============================================================
-        // 8. ВОЗВРАТ В МЕНЮ
+        // 6. ВОЗВРАТ В МЕНЮ
         // ============================================================
         function backToMenu() {
             const frame = document.getElementById('gameFrame');
@@ -199,7 +241,7 @@
         }
 
         // ============================================================
-        // 9. ОБРАБОТКА СООБЩЕНИЙ ОТ ИГР (реклама, сохранения)
+        // 7. ОБРАБОТКА СООБЩЕНИЙ ОТ ИГР (реклама, сохранения)
         // ============================================================
         window.addEventListener('message', function(event) {
             const frame = document.getElementById('gameFrame');
@@ -246,7 +288,11 @@
             }
         });
 
-        console.log('Лаунчер загружен, язык определён:', currentLang);
+        // ============================================================
+        // 8. ЗАПУСК (как в хоккее: initSDK() -> потом всё остальное)
+        // ============================================================
+        // Запускаем приложение, ждём определения языка, затем показываем карточки
+        initApp();
     </script>
 </body>
 </html>
