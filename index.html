@@ -81,49 +81,7 @@
         let translations = TRANSLATIONS[currentLang] || TRANSLATIONS.ru;
 
         // ============================================================
-        // 3. ИНИЦИАЛИЗАЦИЯ SDK В ФОНЕ (с таймаутом)
-        // ============================================================
-        let ysdk = null;
-        let player = null;
-        let sdkReady = false;
-
-        function initSDK() {
-            // Ограничим время ожидания 3 секундами
-            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('SDK timeout')), 3000));
-
-            Promise.race([YaGames.init(), timeout])
-                .then(sdk => {
-                    ysdk = sdk;
-                    sdkReady = true;
-                    console.log('SDK инициализирован');
-
-                    // Пытаемся получить игрока
-                    return ysdk.getPlayer({ scopes: false }).then(p => {
-                        player = p;
-                        console.log('Игрок получен');
-                    }).catch(() => {});
-                })
-                .catch(err => {
-                    console.warn('SDK не инициализирован (таймаут или ошибка):', err);
-                    sdkReady = false;
-                });
-        }
-
-        // Запускаем инициализацию SDK параллельно с отрисовкой
-        initSDK();
-
-        // ============================================================
-        // 4. ОБНОВЛЕНИЕ UI (язык)
-        // ============================================================
-        function updateUI() {
-            document.getElementById('menuTitle').textContent = translations.title;
-            document.getElementById('backButton').textContent = translations.back;
-            document.getElementById('langIndicator').textContent = `Язык: ${currentLang}`;
-        }
-        updateUI();
-
-        // ============================================================
-        // 5. КОНФИГУРАЦИЯ ИГР (локальные файлы)
+        // 3. КОНФИГУРАЦИЯ ИГР (локальные файлы)
         // ============================================================
         const GAMES = [
             { id: "game_ferms", title: "Ферма-кликер", icon: "icon.png", file: "game.html" },
@@ -132,7 +90,7 @@
         ];
 
         // ============================================================
-        // 6. ОТРИСОВКА КАРТОЧЕК (вызывается сразу)
+        // 4. ОТРИСОВКА КАРТОЧЕК (вызывается СРАЗУ, до SDK)
         // ============================================================
         function renderGames() {
             const grid = document.getElementById('gamesGrid');
@@ -166,8 +124,49 @@
             debug.textContent = translations.loaded + GAMES.length;
         }
 
-        // Вызываем сразу, не дожидаясь SDK
+        // Вызываем renderGames немедленно
         renderGames();
+
+        // ============================================================
+        // 5. ОБНОВЛЕНИЕ UI (язык) - тоже сразу
+        // ============================================================
+        function updateUI() {
+            document.getElementById('menuTitle').textContent = translations.title;
+            document.getElementById('backButton').textContent = translations.back;
+            document.getElementById('langIndicator').textContent = `Язык: ${currentLang}`;
+        }
+        updateUI();
+
+        // ============================================================
+        // 6. ИНИЦИАЛИЗАЦИЯ SDK В ФОНЕ (с таймаутом) - не блокирует
+        // ============================================================
+        let ysdk = null;
+        let player = null;
+
+        function initSDK() {
+            // Проверяем, определён ли YaGames
+            if (typeof YaGames === 'undefined') {
+                console.warn('YaGames не определён, SDK не будет инициализирован');
+                return;
+            }
+            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('SDK timeout')), 3000));
+
+            Promise.race([YaGames.init(), timeout])
+                .then(sdk => {
+                    ysdk = sdk;
+                    console.log('SDK инициализирован');
+                    return ysdk.getPlayer({ scopes: false }).then(p => {
+                        player = p;
+                        console.log('Игрок получен');
+                    }).catch(() => {});
+                })
+                .catch(err => {
+                    console.warn('SDK не инициализирован (таймаут или ошибка):', err);
+                });
+        }
+
+        // Запускаем SDK параллельно (не дожидаемся)
+        initSDK();
 
         // ============================================================
         // 7. ЗАПУСК ИГРЫ (с передачей языка)
@@ -184,7 +183,6 @@
 
             const frame = document.getElementById('gameFrame');
             let localPath = `${game.id}/${game.file}`;
-            // Передаём язык в параметре URL
             localPath += `?lang=${currentLang}`;
             frame.src = localPath;
             console.log(`Запускаем игру: ${localPath}`);
